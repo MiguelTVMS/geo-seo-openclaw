@@ -130,7 +130,20 @@ Generated artefacts (llms.txt files, JSON-LD snippets, robots.txt recommendation
 
 ## Git Workflow
 
-- **Branching**: `feature/`, `fix/`, `chore/` off `develop`. Never commit directly to `develop` or `main`.
+This repo uses **GitFlow** as its branching strategy.
+
+| Branch | Purpose |
+|---|---|
+| `main` | Production — tagged releases only |
+| `develop` | Integration branch — all feature work merges here |
+| `feature/<name>` | New features — branch off `develop`, merge back to `develop` |
+| `fix/<name>` | Bug fixes — branch off `develop`, merge back to `develop` |
+| `hotfix/<name>` | Urgent production fixes — branch off `main`, merge to both `main` and `develop` |
+| `release/<version>` | Release prep — branch off `develop`, merge to `main` and `develop` |
+
+**Rules:**
+- Never commit directly to `develop` or `main`
+- Branch names must use the prefixes above — no exceptions
 - **Commit messages**: Imperative, present tense — `Add fetch-page.mjs`, not `Added fetch-page.mjs`
 - **Identity**: `git config user.name "Director Krennic"` and `git config user.email "krennic@miguel.ms"` — set locally in the repo, never rely on global config
 - **Push policy**: Commit freely. Never push — the orchestrator (Krennic) pushes.
