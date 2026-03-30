@@ -142,8 +142,18 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch, includeHtm
     // JSON-LD structured data — must run BEFORE decompose()
     $('script[type="application/ld+json"]').each((_, el) => {
       try {
-        const data = JSON.parse($(el).html());
-        result.structured_data.push(data);
+        const raw = $(el).html();
+        // Guard against empty/missing JSON-LD content; treat as invalid
+        if (raw == null || raw.trim() === '') {
+          result.errors.push('Invalid JSON-LD detected');
+          return;
+        }
+        const data = JSON.parse(raw);
+        if (data !== null && (Array.isArray(data) || typeof data === 'object')) {
+          result.structured_data.push(data);
+        } else {
+          result.errors.push('Invalid JSON-LD detected');
+        }
       } catch {
         result.errors.push('Invalid JSON-LD detected');
       }

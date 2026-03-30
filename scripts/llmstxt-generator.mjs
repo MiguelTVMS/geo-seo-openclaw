@@ -61,7 +61,7 @@ export async function validateLlmstxt(url, { fetchFn = fetch } = {}) {
       const content = await res.text();
       result.content = content;
 
-      const lines = content.trim().split('\n');
+      const lines = content.trim().split(/\r?\n/);
 
       if (lines[0]?.startsWith('# ')) {
         result.has_title = true;
@@ -159,6 +159,14 @@ export async function generateLlmstxt(url, { fetchFn = fetch, maxPages = 30 } = 
   let homepageHtml = '';
   try {
     const res = await fetchFn(`${base}/`, { headers: DEFAULT_HEADERS });
+    if (!(res.ok ?? (res.status >= 200 && res.status < 300))) {
+      const statusText = res.statusText || '';
+      result.issues.push(
+        `Failed to fetch homepage: HTTP ${res.status}${statusText ? ` ${statusText}` : ''}`,
+      );
+      result.status = 'error';
+      return result;
+    }
     homepageHtml = await res.text();
   } catch (err) {
     result.issues.push(`Failed to fetch homepage: ${err.message}`);
