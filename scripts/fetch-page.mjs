@@ -54,6 +54,7 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch } = {}) {
     heading_structure: [],
     word_count: 0,
     text_content: '',
+    html: '',
     internal_links: [],
     external_links: [],
     images: [],
@@ -116,6 +117,7 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch } = {}) {
     }
 
     const html = await response.text();
+    result.html = html;
     const $ = cheerio.load(html);
 
     // Basic metadata
@@ -158,14 +160,15 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch } = {}) {
       }
     });
 
-    // Links — must run BEFORE decompose()
-    const parsedUrl = new URL(url);
+    // Use the final URL after redirect chain for link resolution and classification
+    const effectiveUrl = currentUrl;
+    const parsedUrl = new URL(effectiveUrl);
     const baseDomain = parsedUrl.hostname;
     $('a[href]').each((_, el) => {
       const href = $(el).attr('href');
       if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
       try {
-        const abs = new URL(href, url).href;
+        const abs = new URL(href, effectiveUrl).href;
         const parsed = new URL(abs);
         const linkText = $(el).text().trim();
         if (parsed.hostname === baseDomain) {

@@ -192,8 +192,9 @@ export async function analyzePageCitability(url, { fetchFn } = {}) {
     return { url, error: pageData.errors.join('; ') };
   }
 
-  // Always refetch raw HTML for block extraction unless fetchPage failed entirely
-  const html = await refetchHtml(url, fetchFn);
+  // Reuse HTML from fetchPage if available; refetch only as fallback
+  // This avoids a second network request for the same URL
+  const html = pageData.html || await refetchHtml(url, fetchFn);
   const $ = cheerio.load(html || '');
 
   // Remove non-content elements

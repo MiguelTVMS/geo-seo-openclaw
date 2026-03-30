@@ -2,7 +2,7 @@
  * llmstxt-generator.mjs — llms.txt validator and generator
  *
  * Validates an existing /llms.txt file or generates a new one by crawling
- * the site homepage and sitemap.
+ * the site starting from the homepage.
  *
  * Usage:
  *   node scripts/llmstxt-generator.mjs --url <url> --mode validate
@@ -263,6 +263,15 @@ export async function generateLlmstxt(url, { fetchFn = fetch, maxPages = 30 } = 
  * @returns {Promise<object>}
  */
 export async function runLlmstxt(url, mode = 'validate', { fetchFn = fetch } = {}) {
+  const VALID_MODES = ['validate', 'generate'];
+  if (!VALID_MODES.includes(mode)) {
+    return {
+      status: 'error',
+      issues: [`Unknown mode '${mode}' — valid modes are: ${VALID_MODES.join(', ')}`],
+      generated: '',
+    };
+  }
+
   if (mode === 'validate') {
     const validation = await validateLlmstxt(url, { fetchFn });
     if (!validation.exists) {
