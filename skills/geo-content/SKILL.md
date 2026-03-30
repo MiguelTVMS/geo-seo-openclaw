@@ -1,345 +1,189 @@
 ---
 name: geo-content
-description: Content quality and E-E-A-T assessment for AI citability — evaluate experience, expertise, authoritativeness, trustworthiness, and content structure
-version: 1.0.0
-author: geo-seo-claude
-tags: [geo, content-quality, eeat, citability, ai-content, topical-authority]
-allowed-tools: Read, Grep, Glob, Bash, WebFetch, Write
+description: >
+  E-E-A-T content quality assessment. Evaluates Experience, Expertise, Authoritativeness,
+  and Trustworthiness signals at page level. Also assesses content freshness, topical
+  authority, and AI content quality. Invoked directly via /geo content or as a parallel
+  worker in /geo audit.
 ---
 
-# GEO Content Quality & E-E-A-T Assessment
+# GEO Content Quality & E-E-A-T Assessor
 
 ## Purpose
 
-AI search platforms do not just find content — they evaluate whether content deserves to be cited. The primary framework for this evaluation is **E-E-A-T** (Experience, Expertise, Authoritativeness, Trustworthiness), which per Google's December 2025 Quality Rater Guidelines update now applies to **ALL competitive queries**, not just YMYL (Your Money Your Life) topics. Content that scores high on E-E-A-T is dramatically more likely to be cited by AI platforms.
+AI search platforms evaluate whether content deserves to be cited. E-E-A-T (Experience,
+Expertise, Authoritativeness, Trustworthiness) per Google's Dec 2025 Quality Rater
+Guidelines update now applies to ALL competitive queries.
 
-This skill evaluates content through two lenses:
-1. **E-E-A-T signals** — does the content demonstrate real expertise and trust?
-2. **AI citability** — is the content structured so AI platforms can extract and cite specific claims?
-
-## How to Use This Skill
-
-1. Fetch the target page(s) — homepage, key blog posts, service/product pages
-2. Evaluate E-E-A-T across the 4 dimensions (25% each)
-3. Assess content quality metrics (structure, readability, depth)
-4. Check for AI content quality signals
-5. Evaluate topical authority across the site
-6. Score and generate GEO-CONTENT-ANALYSIS.md
+**This worker's domain:** page-level E-E-A-T, author authority, content freshness,
+topical depth, and content structure quality.
+Passage-level citability scoring (extractability) is handled by `geo-citability`.
 
 ---
 
-## E-E-A-T Framework (100 points total)
+## E-E-A-T Scoring (0–100)
 
-### Experience — 25 points
-First-hand knowledge and direct involvement with the topic. AI platforms increasingly distinguish between content that reports on a topic and content from someone who has DONE it.
+| Dimension | Weight |
+|---|---|
+| Experience | 25% |
+| Expertise | 25% |
+| Authoritativeness | 25% |
+| Trustworthiness | 25% |
 
-**Signals to evaluate:**
+Topical Authority Modifier: +10 (dominant) to −5 (thin). Final score capped at 100.
 
-| Signal | Points | How to Score |
-|---|---|---|
-| First-person accounts ("I tested...", "We implemented...") | 5 | 5 if present and specific, 3 if generic, 0 if absent |
-| Original research or data not available elsewhere | 5 | 5 if original data, 3 if references original work, 0 if none |
-| Case studies with specific results | 4 | 4 if detailed with numbers, 2 if general, 0 if none |
-| Screenshots, photos, or evidence of direct use | 3 | 3 if authentic evidence, 1 if stock/generic, 0 if none |
-| Specific examples from personal experience | 4 | 4 if specific and unique, 2 if somewhat specific, 0 if generic |
-| Demonstrations of process (not just outcome) | 4 | 4 if step-by-step from experience, 2 if partial, 0 if none |
+### Experience (25 pts)
 
-**What to flag as weak Experience:**
-- Content that only summarizes what other sources say without adding new perspective
-- Generic advice that could apply to any situation ("It depends on your needs")
-- No mention of actual usage, testing, or direct involvement
-- Hedging language that suggests lack of direct knowledge ("reportedly", "supposedly", "some say")
+Signals of first-hand knowledge:
 
-### Expertise — 25 points
-Demonstrated knowledge depth and professional competence in the subject matter.
+| Signal | Max pts |
+|---|---|
+| First-person accounts ("I tested...", "We implemented...") | 5 |
+| Original research or data not available elsewhere | 5 |
+| Case studies with specific results and numbers | 4 |
+| Screenshots, photos, or evidence of direct use | 3 |
+| Specific examples from personal experience | 4 |
+| Demonstrations of process (not just outcome) | 4 |
 
-**Signals to evaluate:**
+**Weak Experience flags:** only summarises other sources, generic advice applicable to
+any situation, no mention of direct usage, hedging language ("reportedly", "some say").
 
-| Signal | Points | How to Score |
-|---|---|---|
-| Author credentials visible (bio, degrees, certifications) | 5 | 5 if full credentials, 3 if basic bio, 0 if no author |
-| Technical depth appropriate to topic | 5 | 5 if thorough technical treatment, 3 if adequate, 0 if superficial |
-| Methodology explanation (how conclusions were reached) | 4 | 4 if clear methodology, 2 if some explanation, 0 if none |
-| Data-backed claims (statistics, research citations) | 4 | 4 if well-sourced, 2 if some data, 0 if unsupported claims |
-| Industry-specific terminology used correctly | 3 | 3 if accurate specialized language, 1 if basic, 0 if errors |
-| Author page with detailed professional background | 4 | 4 if dedicated author page, 2 if brief bio, 0 if none |
+### Expertise (25 pts)
 
-**What to flag as weak Expertise:**
-- Claims without supporting evidence or sources
-- Surface-level coverage of complex topics
-- Misuse of technical terminology
-- No visible author or author without relevant credentials
-- Content that is broad and generic rather than deep and specific
+| Signal | Max pts |
+|---|---|
+| Author credentials visible (bio, degrees, certs) | 5 |
+| Technical depth appropriate to topic | 5 |
+| Methodology explanation (how conclusions were reached) | 4 |
+| Data-backed claims with named sources | 4 |
+| Industry-specific terminology used correctly | 3 |
+| Author page with detailed professional background | 4 |
 
-### Authoritativeness — 25 points
-Recognition by others as a credible source on the topic.
+**Weak Expertise flags:** claims without evidence, surface-level coverage, no visible
+author, misuse of technical terms.
 
-**Signals to evaluate:**
+### Authoritativeness (25 pts)
 
-| Signal | Points | How to Score |
-|---|---|---|
-| Inbound citations from authoritative sources | 5 | 5 if cited by major sources, 3 if some citations, 0 if none |
-| Author quoted or cited in press/media | 4 | 4 if media mentions, 2 if industry mentions, 0 if none |
-| Industry awards or recognition mentioned | 3 | 3 if relevant awards, 1 if tangential, 0 if none |
-| Speaker credentials (conferences, events) | 3 | 3 if listed, 0 if none |
-| Published in peer-reviewed or respected outlets | 4 | 4 if tier-1 publications, 2 if industry outlets, 0 if none |
-| Comprehensive topic coverage (topical authority) | 3 | 3 if site covers topic thoroughly, 1 if some coverage, 0 if isolated |
-| Brand mentioned on Wikipedia or authoritative references | 3 | 3 if Wikipedia, 2 if other encyclopedic refs, 0 if none |
+| Signal | Max pts |
+|---|---|
+| Inbound citations from authoritative sources | 5 |
+| Author quoted or cited in press/media | 4 |
+| Industry awards or recognition | 3 |
+| Speaker credentials (conferences, events) | 3 |
+| Published in peer-reviewed or respected outlets | 4 |
+| Comprehensive topic coverage (topical authority) | 3 |
+| Brand mentioned on Wikipedia or authoritative refs | 3 |
 
-**What to flag as weak Authoritativeness:**
-- Single-topic site with no depth of coverage
-- No external validation of expertise claims
-- No backlinks from authoritative sources
-- Claims of authority without evidence (self-proclaimed "expert")
+### Trustworthiness (25 pts)
 
-### Trustworthiness — 25 points
-Signals that the content and its publisher are reliable and transparent.
-
-**Signals to evaluate:**
-
-| Signal | Points | How to Score |
-|---|---|---|
-| Contact information visible (address, phone, email) | 4 | 4 if full contact info, 2 if email only, 0 if none |
-| Privacy policy present and linked | 2 | 2 if present, 0 if absent |
-| Terms of service present | 1 | 1 if present, 0 if absent |
-| HTTPS with valid certificate | 2 | 2 if valid HTTPS, 0 if not |
-| Editorial standards or corrections policy | 3 | 3 if documented, 1 if implicit, 0 if none |
-| Transparent about business model and conflicts | 3 | 3 if clear disclosures, 1 if some, 0 if none |
-| Reviews and testimonials from real customers | 3 | 3 if verified reviews, 1 if testimonials, 0 if none |
-| Accurate claims (no misinformation detected) | 4 | 4 if all claims accurate, 2 if mostly accurate, 0 if errors found |
-| Clear affiliate/sponsorship disclosures | 3 | 3 if properly disclosed, 0 if undisclosed or absent |
-
-**What to flag as weak Trustworthiness:**
-- No contact information or physical address
-- Missing privacy policy or terms
-- Undisclosed affiliate links or sponsored content
-- Claims that are verifiably false or misleading
-- No way to contact the publisher for corrections
+| Signal | Max pts |
+|---|---|
+| Contact information visible (address, phone, email) | 4 |
+| Privacy policy present and linked | 2 |
+| Terms of service present | 1 |
+| HTTPS with valid cert | 2 |
+| Editorial standards or corrections policy | 3 |
+| Transparent about business model and conflicts | 3 |
+| Verified reviews/testimonials | 3 |
+| Accurate claims (no detectable misinformation) | 4 |
+| Clear affiliate/sponsorship disclosures | 3 |
 
 ---
 
-## Content Quality Metrics
+## Content Quality Checks
 
-### Word Count Benchmarks
-These are **floors, not targets**. More words does not mean better content. The benchmark is the minimum length to adequately cover a topic for AI citability.
+### Word Count Benchmarks (floors, not targets)
 
-| Page Type | Minimum Words | Ideal Range | Notes |
-|---|---|---|---|
-| Homepage | 500 | 500-1,500 | Clear value proposition, not a wall of text |
-| Blog post | 1,500 | 1,500-3,000 | Thorough but focused |
-| Pillar content / Ultimate guide | 2,000 | 2,500-5,000 | Comprehensive topic coverage |
-| Product page | 300 | 500-1,500 | Descriptions, specs, use cases |
-| Service page | 500 | 800-2,000 | What, how, why, for whom |
-| About page | 300 | 500-1,000 | Company/person story and credentials |
-| FAQ page | 500 | 1,000-2,500 | Thorough answers, not one-liners |
-
-### Readability Assessment
-- **Target Flesch Reading Ease**: 60-70 (8th-9th grade level)
-- This is NOT a direct ranking factor but affects citability — AI platforms prefer content that is clear and unambiguous
-- Overly academic writing (score < 30) reduces citability for general queries
-- Overly simple writing (score > 80) may lack the depth needed for expertise signals
-
-**How to estimate without a tool:**
-- Average sentence length: 15-20 words is ideal
-- Average paragraph length: 2-4 sentences
-- Presence of jargon: should be defined when first used
-- Passive voice: < 15% of sentences
+| Page Type | Minimum | Ideal |
+|---|---|---|
+| Homepage | 500 | 500–1,500 |
+| Blog post | 1,500 | 1,500–3,000 |
+| Pillar / ultimate guide | 2,000 | 2,500–5,000 |
+| Service page | 500 | 800–2,000 |
+| About page | 300 | 500–1,000 |
 
 ### Paragraph Structure for AI Parsing
-AI platforms extract content at the paragraph level. Each paragraph should be a self-contained unit of meaning.
 
-**Optimal paragraph structure:**
-- **2-4 sentences** per paragraph (1-sentence paragraphs are weak; 5+ sentences are hard to extract)
-- **One idea per paragraph** — do not mix topics within a paragraph
-- **Lead with the key claim** — first sentence should contain the main point
-- **Support with evidence** — remaining sentences provide data, examples, or context
-- **Quotable standalone** — each paragraph should make sense if extracted in isolation
+- 2–4 sentences per paragraph
+- One idea per paragraph
+- Lead with key claim in first sentence
+- Each paragraph quotable in isolation
 
 ### Heading Structure
-- **One H1 per page** — the primary topic/title
-- **H2 for major sections** — should represent distinct subtopics
-- **H3 for subsections** — nested under relevant H2
-- **No skipped levels** — do not go from H1 to H3 without an H2
-- **Descriptive headings** — "How to Optimize for AI Search" not "Section 2"
-- **Question-based headings** where appropriate — these map directly to AI queries
 
-### Internal Linking
-- Every content page should link to 3-5 related pages on the same site
-- Links should use descriptive anchor text (not "click here")
-- Create a topic cluster structure: pillar page linked to/from all related subtopic pages
-- Orphan pages (no internal links pointing to them) are rarely cited by AI
+- One H1 per page
+- H2 for major sections, H3 for subsections
+- No skipped levels
+- Question-based headings where appropriate ("How does X work?")
 
----
+### Content Freshness
 
-## AI Content Assessment
-
-### AI-Generated Content Policy
-AI-generated content is **acceptable** per Google's guidance (March 2024 clarification) as long as it demonstrates genuine E-E-A-T signals and has human oversight. The concern is not HOW content is created but WHETHER it provides value.
-
-### Signs of Low-Quality AI Content (flag these)
-
-| Signal | Description |
+| Currency | Status |
 |---|---|
-| Generic phrasing | "In today's fast-paced world...", "It's important to note that...", "At the end of the day..." |
-| No original insight | Content that only rephrases widely available information |
-| Lack of first-hand experience | No personal anecdotes, case studies, or specific examples |
-| Perfect but empty structure | Well-formatted headings with shallow content beneath them |
-| No specific examples | Uses abstract explanations without concrete instances |
-| Repetitive conclusions | Each section ends with a variation of the same point |
-| Hedging overload | "Generally speaking", "In most cases", "It depends on various factors" without specifying which factors |
-| Missing human voice | No opinions, preferences, or professional judgment expressed |
-| Filler content | Paragraphs that could be deleted without losing information |
-| No data or sources | Claims presented as facts without attribution or evidence |
+| Updated within 3 months | Excellent |
+| Updated within 6 months | Good |
+| Updated within 12 months | Acceptable |
+| 12–24 months ago | Warning |
+| No date or 24+ months | Critical |
 
-### High-Quality Content Signals (regardless of production method)
+---
 
-| Signal | Description |
+## AI-Generated Content Quality
+
+AI-produced content is acceptable (Google March 2024) when it shows genuine E-E-A-T.
+
+**Low-quality AI content flags:**
+- Generic phrasing: "In today's fast-paced world...", "It's important to note..."
+- No original insight — only rephrases widely available information
+- Perfect structure with shallow content beneath headings
+- Repetitive conclusions, hedging overload ("generally speaking", "it depends on factors")
+- Zero first-person examples, no data, no named sources
+
+**High-quality signals regardless of production method:**
+- Original data (surveys, benchmarks, experiments)
+- Named specific examples (companies, dates, numbers)
+- Contrarian or nuanced views backed by reasoning
+- Practical, specific recommendations with acknowledged trade-offs
+
+---
+
+## Topical Authority Modifier
+
+| Level | Criteria | Modifier |
+|---|---|---|
+| Authority | 20+ pages covering topic comprehensively, strong internal linking clusters | +10 |
+| Developing | 10–20 pages, some clustering | +5 |
+| Emerging | 5–10 pages, limited clustering | +0 |
+| Thin | < 5 pages, no clustering | −5 |
+
+---
+
+## Score Interpretation
+
+| Range | Rating |
 |---|---|
-| Original data | Surveys, experiments, benchmarks, proprietary analysis |
-| Specific examples | Named products, companies, dates, numbers |
-| Contrarian or nuanced views | Disagreement with conventional wisdom, backed by reasoning |
-| First-person experience | "When I tested this..." or "Our team found..." |
-| Updated information | References to recent events, current data |
-| Expert opinion | Clear professional judgment, not just facts |
-| Practical recommendations | Specific, actionable advice, not vague guidance |
-| Trade-offs acknowledged | "This approach works well for X but not for Y because..." |
+| 85–100 | Exceptional — strong AI citation candidate |
+| 70–84 | Good — solid foundation |
+| 55–69 | Average — multiple E-E-A-T gaps |
+| 40–54 | Below Average — significant content issues |
+| 0–39 | Poor — fundamental overhaul needed |
 
 ---
 
-## Content Freshness Assessment
+## Worker Return Format
 
-### Publication Dates
-- Check for visible `datePublished` and `dateModified` in both the content and structured data
-- Content without dates is treated as less trustworthy by AI platforms
-- Dates should be specific (January 15, 2026) not vague ("recently")
-
-### Freshness Scoring
-
-| Criterion | Score |
-|---|---|
-| Updated within 3 months | Excellent — current and relevant |
-| Updated within 6 months | Good — still reasonably current |
-| Updated within 12 months | Acceptable — may need refresh |
-| Updated 12-24 months ago | Warning — review for accuracy |
-| No date or 24+ months old | Critical — AI platforms may deprioritize |
-
-### Evergreen Indicators
-Some content remains relevant regardless of age. Flag content as evergreen if:
-- It covers fundamental concepts that do not change (physics, basic math, legal definitions)
-- It is clearly labeled as a reference/guide for lasting concepts
-- It does not contain time-dependent claims ("the latest", "currently", "in 2024")
-
----
-
-## Topical Authority Assessment
-
-### What It Is
-Topical authority measures whether a site comprehensively covers a topic rather than touching on it superficially. AI platforms prefer citing sites that are recognized authorities on their topics.
-
-### How to Assess
-1. **Content breadth**: Does the site have multiple pages covering different aspects of its core topic?
-2. **Content depth**: Do individual pages go deep into subtopics?
-3. **Topic clustering**: Are pages organized into logical groups with internal linking?
-4. **Content gaps**: Are there obvious subtopics that the site should cover but does not?
-5. **Competitor comparison**: Do competitors cover subtopics that this site misses?
-
-### Scoring
-
-| Level | Description | Score Impact |
-|---|---|---|
-| Authority | 20+ pages covering topic comprehensively, strong clustering | +10 bonus |
-| Developing | 10-20 pages with some clustering | +5 bonus |
-| Emerging | 5-10 pages on topic, limited clustering | +0 |
-| Thin | < 5 pages, no clustering | -5 penalty |
-
----
-
-## Overall Scoring (0-100)
-
-### Score Composition
-| Component | Weight | Max Points |
-|---|---|---|
-| Experience | 25% | 25 |
-| Expertise | 25% | 25 |
-| Authoritativeness | 25% | 25 |
-| Trustworthiness | 25% | 25 |
-| **Subtotal** | | **100** |
-| Topical Authority Modifier | | +10 to -5 |
-| **Final Score** | | **Capped at 100** |
-
-### Score Interpretation
-- **85-100**: Exceptional — strong AI citation candidate across platforms
-- **70-84**: Good — solid foundation, specific improvements will increase citability
-- **55-69**: Average — multiple E-E-A-T gaps reducing AI visibility
-- **40-54**: Below Average — significant content quality and trust issues
-- **0-39**: Poor — fundamental content strategy overhaul needed
-
----
-
-## Output Format
-
-Generate **GEO-CONTENT-ANALYSIS.md** with:
-
-```markdown
-# GEO Content Quality & E-E-A-T Analysis — [Domain]
-Date: [Date]
-
-## Content Score: XX/100
-
-## E-E-A-T Breakdown
-| Dimension | Score | Key Finding |
-|---|---|---|
-| Experience | XX/25 | [One-line summary] |
-| Expertise | XX/25 | [One-line summary] |
-| Authoritativeness | XX/25 | [One-line summary] |
-| Trustworthiness | XX/25 | [One-line summary] |
-
-## Topical Authority Modifier: [+10 to -5]
-
-## Pages Analyzed
-| Page | Word Count | Readability | Heading Structure | Citability Rating |
-|---|---|---|---|---|
-| [URL] | [Count] | [Score] | [Pass/Warn/Fail] | [High/Medium/Low] |
-
-## E-E-A-T Detailed Findings
-
-### Experience
-[Specific passages and pages with strong/weak experience signals]
-
-### Expertise
-[Author credentials found, technical depth assessment, specific gaps]
-
-### Authoritativeness
-[External validation found, topical authority assessment, gaps]
-
-### Trustworthiness
-[Trust signals present/missing, accuracy concerns if any]
-
-## Content Quality Issues
-[Specific passages flagged with reasons and rewrite suggestions]
-
-## AI Content Concerns
-[Any low-quality AI content patterns detected, with specific examples]
-
-## Freshness Assessment
-| Page | Published | Last Updated | Status |
-|---|---|---|---|
-| [URL] | [Date] | [Date] | [Current/Stale/No Date] |
-
-## Citability Assessment
-### Most Citable Passages
-[Top 5 passages that AI platforms are most likely to cite, with reasons]
-
-### Least Citable Pages
-[Pages with lowest citability, with specific improvement recommendations]
-
-## Improvement Recommendations
-### Quick Wins
-[Specific content changes that can be made immediately]
-
-### Content Gaps
-[Topics the site should cover to strengthen topical authority]
-
-### Author/E-E-A-T Improvements
-[Specific steps to strengthen E-E-A-T signals]
+```json
+{
+  "score": 44,
+  "critical_3": [
+    "No author attribution on any content page — AI systems cannot assess expertise",
+    "All blog posts lack publication dates — treated as stale by freshness-sensitive AI platforms",
+    "About page 87 words — insufficient for trust signals or expertise demonstration"
+  ],
+  "quick_wins_3": [
+    "Add author byline with credentials to all blog posts",
+    "Add datePublished and dateModified to every content page (visible + schema)",
+    "Expand About page to 500+ words: founding story, team credentials, mission"
+  ]
+}
 ```
