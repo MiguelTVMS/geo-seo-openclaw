@@ -185,7 +185,9 @@ export async function generateLlmstxt(url, { fetchFn = fetch, maxPages = 30 } = 
     Support: [],
   };
 
-  const seen = new Set([base + '/', base]);
+  // Initialize seen with just the base URL (not base+'/' duplicate)
+  // so pages_analyzed accurately reflects discovered URLs
+  const seen = new Set([base]);
   const SKIP_EXTS = /\.(pdf|jpg|jpeg|png|gif|svg|webp|css|js|ico|xml|json)$/i;
 
   $('a[href]').each((_, el) => {
@@ -274,24 +276,26 @@ export async function runLlmstxt(url, mode = 'validate', { fetchFn = fetch } = {
 
   if (mode === 'validate') {
     const validation = await validateLlmstxt(url, { fetchFn });
-    if (!validation.exists) {
-      const generated = await generateLlmstxt(url, { fetchFn });
-      // Merge issues/suggestions intentionally — don't overwrite validation reason
-      return {
-        ...validation,
-        ...generated,
-        issues: [
-          ...(Array.isArray(validation.issues) ? validation.issues : []),
-          ...(Array.isArray(generated.issues) ? generated.issues : []),
-        ],
-        suggestions: [
-          ...(Array.isArray(validation.suggestions) ? validation.suggestions : []),
-          ...(Array.isArray(generated.suggestions) ? generated.suggestions : []),
-        ],
-        status: 'not_found',
-      };
+    // Only fall back to generate on true not-found (404/DNS miss).
+    // Preserve http_error/error statuses — don't generate on 403/500.
+    if (validation.status !== 'not_found') {
+      return validation;
     }
-    return validation;
+    const generated = await generateLlmstxt(url, { fetchFn });
+    // Merge issues/suggestions intentionally — don't overwrite validation reason
+    return {
+      ...validation,
+      ...generated,
+      issues: [
+        ...(Array.isArray(validation.issues) ? validation.issues : []),
+        ...(Array.isArray(generated.issues) ? generated.issues : []),
+      ],
+      suggestions: [
+        ...(Array.isArray(validation.suggestions) ? validation.suggestions : []),
+        ...(Array.isArray(generated.suggestions) ? generated.suggestions : []),
+      ],
+      status: 'not_found',
+    };
   }
   return generateLlmstxt(url, { fetchFn });
 }

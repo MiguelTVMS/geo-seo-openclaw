@@ -186,7 +186,7 @@ export function scorePassage(text, heading = null) {
  * @returns {Promise<object>}
  */
 export async function analyzePageCitability(url, { fetchFn } = {}) {
-  const pageData = await fetchPage(url, fetchFn ? { fetchFn } : {});
+  const pageData = await fetchPage(url, fetchFn ? { fetchFn, includeHtml: true } : { includeHtml: true });
 
   if (pageData.errors.length > 0 && !pageData.status_code) {
     return { url, error: pageData.errors.join('; ') };

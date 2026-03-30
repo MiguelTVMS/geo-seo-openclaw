@@ -41,7 +41,7 @@ const FRAMEWORK_ROOT_RE = /(app|root|__next|__nuxt)/i;
  * @param {{ timeout?: number, fetchFn?: Function }} options
  * @returns {Promise<object>}
  */
-export async function fetchPage(url, { timeout = 30, fetchFn = fetch } = {}) {
+export async function fetchPage(url, { timeout = 30, fetchFn = fetch, includeHtml = false } = {}) {
   const result = {
     url,
     status_code: null,
@@ -54,7 +54,6 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch } = {}) {
     heading_structure: [],
     word_count: 0,
     text_content: '',
-    html: '',
     internal_links: [],
     external_links: [],
     images: [],
@@ -117,7 +116,9 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch } = {}) {
     }
 
     const html = await response.text();
-    result.html = html;
+    // Only include raw HTML in output when explicitly requested (opt-in)
+    // to keep default stdout output lightweight
+    if (includeHtml) result.html = html;
     const $ = cheerio.load(html);
 
     // Basic metadata
