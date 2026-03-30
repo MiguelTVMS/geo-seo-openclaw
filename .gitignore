@@ -61,3 +61,6 @@ Thumbs.db
 
 # Git worktrees
 .worktrees/
+CLAUDE_REVIEW_*.md
+CODEX_REVIEW_*.md
+PLAN_REVIEW.md

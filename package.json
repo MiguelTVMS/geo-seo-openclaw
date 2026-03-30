@@ -1,0 +1,12 @@
+{
+  "name": "geo-seo-openclaw",
+  "version": "0.1.0",
+  "description": "GEO analysis OpenClaw skill",
+  "type": "module",
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0"
+  }
+}
