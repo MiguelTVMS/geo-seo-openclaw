@@ -38,7 +38,7 @@ const FRAMEWORK_ROOT_RE = /(app|root|__next|__nuxt)/i;
  * Fetch a page and return structured analysis data.
  *
  * @param {string} url
- * @param {{ timeout?: number, fetchFn?: Function }} options
+ * @param {{ timeout?: number, fetchFn?: Function, includeHtml?: boolean }} options
  * @returns {Promise<object>}
  */
 export async function fetchPage(url, { timeout = 30, fetchFn = fetch, includeHtml = false } = {}) {
@@ -88,7 +88,7 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch, includeHtm
           break;
         }
         const nextUrl = new URL(location, currentUrl).toString();
-        result.redirect_chain.push({ url: nextUrl, status });
+        result.redirect_chain.push({ url: currentUrl, from: currentUrl, to: nextUrl, status });
         currentUrl = nextUrl;
         if (i === MAX_REDIRECTS - 1) redirectLimitExceeded = true;
         continue;
@@ -133,8 +133,9 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch, includeHtm
     // Heading structure — must run BEFORE decompose()
     $('h1, h2, h3, h4, h5, h6').each((_, el) => {
       const tag = el.tagName.toLowerCase();
+      const level = parseInt(tag.slice(1), 10);
       const text = $(el).text().trim();
-      result.heading_structure.push({ tag, text });
+      result.heading_structure.push({ tag, level, text });
       if (tag === 'h1') result.h1_tags.push(text);
     });
 
