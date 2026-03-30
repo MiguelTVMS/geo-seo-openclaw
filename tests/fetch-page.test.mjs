@@ -7,7 +7,8 @@
  * framework-style root divs (id="app", id="root") but serving full HTML via
  * SSR/prerendering were incorrectly flagged as client-side-only.
  *
- * 8 test suites, 18 assertions — mirrors Python test class structure exactly.
+ * 6 test suites, 18 core assertions — closely tracks the Python test classes,
+ * plus an additional TestOutputContract suite specific to this implementation.
  */
 
 import { describe, it } from 'node:test';

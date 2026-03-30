@@ -7,10 +7,12 @@
  * Usage:
  *   node scripts/llmstxt-generator.mjs --url <url> --mode validate
  *   node scripts/llmstxt-generator.mjs --url <url> --mode generate
+ *   node scripts/llmstxt-generator.mjs --help
  *
- * Output: JSON to stdout. Errors to stderr, exit code 1.
+ * Output: JSON to stdout (including on fatal error). Errors also to stderr, exit code 1.
  */
 
+import { fileURLToPath } from 'node:url';
 import * as cheerio from 'cheerio';
 
 const DEFAULT_HEADERS = {
@@ -102,6 +104,8 @@ export async function validateLlmstxt(url, { fetchFn = fetch } = {}) {
       result.score = _scoreValidation(result);
     } else {
       result.issues.push(`llms.txt returned HTTP ${res.status}`);
+      // Distinguish HTTP errors from true 404/not-found
+      if (res.status !== 404) result.status = 'http_error';
     }
   } catch (err) {
     result.issues.push(`Error fetching llms.txt: ${err.message}`);
@@ -149,6 +153,7 @@ export async function generateLlmstxt(url, { fetchFn = fetch, maxPages = 30 } = 
     sections: {},
     generated: '',
     issues: [],
+    suggestions: [],
   };
 
   let homepageHtml = '';
@@ -222,7 +227,6 @@ export async function generateLlmstxt(url, { fetchFn = fetch, maxPages = 30 } = 
   // Build llms.txt content
   const lines = [`# ${siteName}`, `> ${siteDescription}`, ''];
 
-  // Always include homepage first
   lines.push('## Main Pages');
   lines.push(`- [Home](${base}/): Homepage of ${siteName}.`);
   for (const p of pages['Main Pages'].slice(0, 8)) {
@@ -261,10 +265,22 @@ export async function generateLlmstxt(url, { fetchFn = fetch, maxPages = 30 } = 
 export async function runLlmstxt(url, mode = 'validate', { fetchFn = fetch } = {}) {
   if (mode === 'validate') {
     const validation = await validateLlmstxt(url, { fetchFn });
-    // If not found, also generate so the caller gets a ready-to-use file
     if (!validation.exists) {
       const generated = await generateLlmstxt(url, { fetchFn });
-      return { ...validation, ...generated, status: 'not_found' };
+      // Merge issues/suggestions intentionally — don't overwrite validation reason
+      return {
+        ...validation,
+        ...generated,
+        issues: [
+          ...(Array.isArray(validation.issues) ? validation.issues : []),
+          ...(Array.isArray(generated.issues) ? generated.issues : []),
+        ],
+        suggestions: [
+          ...(Array.isArray(validation.suggestions) ? validation.suggestions : []),
+          ...(Array.isArray(generated.suggestions) ? generated.suggestions : []),
+        ],
+        status: 'not_found',
+      };
     }
     return validation;
   }
@@ -277,19 +293,33 @@ export async function runLlmstxt(url, mode = 'validate', { fetchFn = fetch } = {
 
 function getBase(url) {
   const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
-  return `${parsed.protocol}//${parsed.hostname}`;
+  // Use host (hostname + port) to preserve explicit ports (e.g., localhost:3000)
+  return `${parsed.protocol}//${parsed.host}`;
 }
 
 // CLI entrypoint
-if (process.argv[1] === new URL(import.meta.url).pathname) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
+
+  if (args.includes('--help')) {
+    process.stdout.write(
+      'Usage: node scripts/llmstxt-generator.mjs --url <url> [--mode validate|generate]\n\n' +
+      'Options:\n' +
+      '  --url <url>              URL to analyse (required)\n' +
+      '  --mode validate|generate Mode of operation (default: validate)\n' +
+      '  --help                   Show this help message\n\n' +
+      'Output: JSON to stdout. On error, JSON error object to stdout + message to stderr.\n'
+    );
+    process.exit(0);
+  }
+
   const urlIdx = args.indexOf('--url');
   const modeIdx = args.indexOf('--mode');
 
   if (urlIdx === -1 || !args[urlIdx + 1]) {
-    process.stderr.write(
-      'Usage: node scripts/llmstxt-generator.mjs --url <url> --mode validate|generate\n'
-    );
+    process.stderr.write('Error: --url is required\n');
+    process.stderr.write('Run with --help for usage.\n');
+    process.stdout.write(JSON.stringify({ error: '--url is required' }) + '\n');
     process.exit(1);
   }
 
@@ -299,7 +329,13 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   runLlmstxt(url, mode)
     .then((result) => process.stdout.write(JSON.stringify(result, null, 2) + '\n'))
     .catch((err) => {
-      process.stderr.write(`Fatal: ${err.message}\n`);
+      const msg = err?.message ?? 'Unknown error';
+      process.stderr.write(`Fatal: ${msg}\n`);
+      try {
+        process.stdout.write(JSON.stringify({ error: msg }) + '\n');
+      } catch {
+        process.stdout.write('{"error":"Unknown error"}\n');
+      }
       process.exit(1);
     });
 }

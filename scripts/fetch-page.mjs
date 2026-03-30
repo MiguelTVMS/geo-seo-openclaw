@@ -9,9 +9,11 @@
  * - SSR detection (Issue #19: dual-condition guard prevents false positives)
  *
  * Usage: node scripts/fetch-page.mjs --url <url> [--timeout <seconds>]
- * Output: JSON to stdout. Errors to stderr, exit code 1.
+ *        node scripts/fetch-page.mjs --help
+ * Output: JSON to stdout (including on fatal error). Errors also to stderr, exit code 1.
  */
 
+import { fileURLToPath } from 'node:url';
 import * as cheerio from 'cheerio';
 
 const DEFAULT_HEADERS = {
@@ -27,6 +29,7 @@ const SECURITY_HEADERS = [
   'x-content-type-options',
   'x-frame-options',
   'referrer-policy',
+  'permissions-policy',
 ];
 
 const FRAMEWORK_ROOT_RE = /(app|root|__next|__nuxt)/i;
@@ -68,6 +71,7 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch } = {}) {
     const MAX_REDIRECTS = 10;
     let currentUrl = url;
     let response;
+    let redirectLimitExceeded = false;
 
     for (let i = 0; i < MAX_REDIRECTS; i++) {
       response = await fetchFn(currentUrl, {
@@ -79,17 +83,21 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch } = {}) {
       const status = response.status;
       if (status >= 300 && status < 400) {
         const location = response.headers.get('location');
-        if (!location) break;
+        if (!location) {
+          result.errors.push(`Redirect response (${status}) missing Location header at ${currentUrl}`);
+          break;
+        }
         const nextUrl = new URL(location, currentUrl).toString();
         result.redirect_chain.push({ url: nextUrl, status });
         currentUrl = nextUrl;
+        if (i === MAX_REDIRECTS - 1) redirectLimitExceeded = true;
         continue;
       }
       break;
     }
 
     if (!response) throw new Error('No response received');
-    if (response.status >= 300 && response.status < 400) {
+    if (redirectLimitExceeded) {
       result.errors.push('Too many redirects');
     }
 
@@ -191,8 +199,6 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch } = {}) {
     // Only flag CSR when BOTH conditions hold:
     //   1. Framework root div has < 50 chars of inner text
     //   2. Overall page word count is < 200
-    // This prevents false positives on SSR sites (WordPress, LiteSpeed, Next.js SSR)
-    // that happen to use <div id="app"> or <div id="root"> as their mount point.
     for (const check of ssrCheckResults) {
       if (check.text_length < 50 && result.word_count < 200) {
         result.has_ssr_content = false;
@@ -219,13 +225,28 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch } = {}) {
 }
 
 // CLI entrypoint
-if (process.argv[1] === new URL(import.meta.url).pathname) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
+
+  if (args.includes('--help')) {
+    process.stdout.write(
+      'Usage: node scripts/fetch-page.mjs --url <url> [--timeout <seconds>]\n\n' +
+      'Options:\n' +
+      '  --url <url>         URL to fetch (required)\n' +
+      '  --timeout <seconds> Request timeout in seconds (default: 30)\n' +
+      '  --help              Show this help message\n\n' +
+      'Output: JSON to stdout. On error, JSON error object to stdout + message to stderr.\n'
+    );
+    process.exit(0);
+  }
+
   const urlIdx = args.indexOf('--url');
   const timeoutIdx = args.indexOf('--timeout');
 
   if (urlIdx === -1 || !args[urlIdx + 1]) {
-    process.stderr.write('Usage: node scripts/fetch-page.mjs --url <url> [--timeout <seconds>]\n');
+    process.stderr.write('Error: --url is required\n');
+    process.stderr.write('Run with --help for usage.\n');
+    process.stdout.write(JSON.stringify({ error: '--url is required' }) + '\n');
     process.exit(1);
   }
 
@@ -242,7 +263,13 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   fetchPage(url, { timeout })
     .then((result) => process.stdout.write(JSON.stringify(result, null, 2) + '\n'))
     .catch((err) => {
-      process.stderr.write(`Fatal: ${err.message}\n`);
+      const msg = err?.message ?? 'Unknown error';
+      process.stderr.write(`Fatal: ${msg}\n`);
+      try {
+        process.stdout.write(JSON.stringify({ error: msg }) + '\n');
+      } catch {
+        process.stdout.write('{"error":"Unknown error"}\n');
+      }
       process.exit(1);
     });
 }

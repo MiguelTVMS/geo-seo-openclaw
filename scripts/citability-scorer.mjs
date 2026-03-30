@@ -9,6 +9,7 @@
  * Output: JSON to stdout. Errors to stderr, exit code 1.
  */
 
+import { fileURLToPath } from 'node:url';
 import * as cheerio from 'cheerio';
 import { fetchPage } from './fetch-page.mjs';
 
@@ -191,8 +192,9 @@ export async function analyzePageCitability(url, { fetchFn } = {}) {
     return { url, error: pageData.errors.join('; ') };
   }
 
-  // Parse HTML again with cheerio for block extraction
-  const $ = cheerio.load(pageData.text_content ? await refetchHtml(url, fetchFn) : '');
+  // Always refetch raw HTML for block extraction unless fetchPage failed entirely
+  const html = await refetchHtml(url, fetchFn);
+  const $ = cheerio.load(html || '');
 
   // Remove non-content elements
   $('script, style, nav, footer, header, aside, form').each((_, el) => $(el).remove());
@@ -275,19 +277,39 @@ async function refetchHtml(url, fetchFn) {
 }
 
 // CLI entrypoint
-if (process.argv[1] === new URL(import.meta.url).pathname) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
+
+  if (args.includes('--help')) {
+    process.stdout.write(
+      'Usage: node scripts/citability-scorer.mjs --url <url>\n\n' +
+      'Options:\n' +
+      '  --url <url>  URL to analyse (required)\n' +
+      '  --help       Show this help message\n\n' +
+      'Output: JSON to stdout. On error, JSON error object to stdout + message to stderr.\n'
+    );
+    process.exit(0);
+  }
+
   const urlIdx = args.indexOf('--url');
 
   if (urlIdx === -1 || !args[urlIdx + 1]) {
-    process.stderr.write('Usage: node scripts/citability-scorer.mjs --url <url>\n');
+    process.stderr.write('Error: --url is required\n');
+    process.stderr.write('Run with --help for usage.\n');
+    process.stdout.write(JSON.stringify({ error: '--url is required' }) + '\n');
     process.exit(1);
   }
 
   analyzePageCitability(args[urlIdx + 1])
     .then((result) => process.stdout.write(JSON.stringify(result, null, 2) + '\n'))
     .catch((err) => {
-      process.stderr.write(`Fatal: ${err.message}\n`);
+      const msg = err?.message ?? 'Unknown error';
+      process.stderr.write(`Fatal: ${msg}\n`);
+      try {
+        process.stdout.write(JSON.stringify({ error: msg }) + '\n');
+      } catch {
+        process.stdout.write('{"error":"Unknown error"}\n');
+      }
       process.exit(1);
     });
 }
