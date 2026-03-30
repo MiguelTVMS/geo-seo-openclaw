@@ -90,7 +90,10 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch, includeHtm
         const nextUrl = new URL(location, currentUrl).toString();
         result.redirect_chain.push({ url: currentUrl, from: currentUrl, to: nextUrl, status });
         currentUrl = nextUrl;
-        if (i === MAX_REDIRECTS - 1) redirectLimitExceeded = true;
+        if (i === MAX_REDIRECTS - 1) {
+        redirectLimitExceeded = true;
+        break; // Don't process the redirect response as page content
+      }
         continue;
       }
       break;

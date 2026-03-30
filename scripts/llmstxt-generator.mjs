@@ -232,6 +232,7 @@ export async function generateLlmstxt(url, { fetchFn = fetch, maxPages = 30 } = 
   });
 
   result.pages_analyzed = seen.size;
+  result.urls_discovered = seen.size; // Alias: links found via <a> tags (not all fetched)
   result.sections = Object.fromEntries(Object.entries(pages).map(([k, v]) => [k, v.length]));
 
   // Build llms.txt content

@@ -133,7 +133,7 @@ export function scorePassage(text, heading = null) {
   if (/\b20(?:2[3-6]|1\d)\b/.test(text)) sd += 2;
 
   const sourcePatterns = [
-    /(?:according to|per|from|by)\s+[A-Z]/,
+    /(?:according to|per|from|by)\s+[A-Z]/i,
     /(?:Gartner|Forrester|McKinsey|Harvard|Stanford|MIT|Google|Microsoft|OpenAI|Anthropic)/,
     /\([A-Z][a-z]+(?:\s+\d{4})?\)/,
   ];
