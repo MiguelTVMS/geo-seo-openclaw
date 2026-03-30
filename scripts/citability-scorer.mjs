@@ -22,7 +22,8 @@ import { fetchPage } from './fetch-page.mjs';
  * @returns {object}
  */
 export function scorePassage(text, heading = null) {
-  const words = text.trim().split(/\s+/);
+  const trimmedText = text.trim();
+  const words = trimmedText === '' ? [] : trimmedText.split(/\s+/);
   const wordCount = words.length;
 
   const scores = {

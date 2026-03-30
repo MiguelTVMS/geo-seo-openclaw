@@ -29,7 +29,7 @@ const SECURITY_HEADERS = [
   'referrer-policy',
 ];
 
-const FRAMEWORK_ROOT_RE = /^(app|root|__next|__nuxt)$/i;
+const FRAMEWORK_ROOT_RE = /(app|root|__next|__nuxt)/i;
 
 /**
  * Fetch a page and return structured analysis data.
@@ -64,11 +64,34 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch } = {}) {
   const timer = setTimeout(() => controller.abort(), timeout * 1000);
 
   try {
-    const response = await fetchFn(url, {
-      headers: DEFAULT_HEADERS,
-      redirect: 'follow',
-      signal: controller.signal,
-    });
+    // Manually follow redirects to populate redirect_chain
+    const MAX_REDIRECTS = 10;
+    let currentUrl = url;
+    let response;
+
+    for (let i = 0; i < MAX_REDIRECTS; i++) {
+      response = await fetchFn(currentUrl, {
+        headers: DEFAULT_HEADERS,
+        redirect: 'manual',
+        signal: controller.signal,
+      });
+
+      const status = response.status;
+      if (status >= 300 && status < 400) {
+        const location = response.headers.get('location');
+        if (!location) break;
+        const nextUrl = new URL(location, currentUrl).toString();
+        result.redirect_chain.push({ url: nextUrl, status });
+        currentUrl = nextUrl;
+        continue;
+      }
+      break;
+    }
+
+    if (!response) throw new Error('No response received');
+    if (response.status >= 300 && response.status < 400) {
+      result.errors.push('Too many redirects');
+    }
 
     result.status_code = response.status;
 
@@ -207,7 +230,14 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   }
 
   const url = args[urlIdx + 1];
-  const timeout = timeoutIdx !== -1 ? parseInt(args[timeoutIdx + 1], 10) : 30;
+  let timeout = 30;
+  if (timeoutIdx !== -1) {
+    const rawTimeout = args[timeoutIdx + 1];
+    const parsedTimeout = Number.parseInt(rawTimeout, 10);
+    if (Number.isFinite(parsedTimeout) && parsedTimeout > 0) {
+      timeout = parsedTimeout;
+    }
+  }
 
   fetchPage(url, { timeout })
     .then((result) => process.stdout.write(JSON.stringify(result, null, 2) + '\n'))

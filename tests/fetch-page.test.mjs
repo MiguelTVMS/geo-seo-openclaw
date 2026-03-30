@@ -10,7 +10,7 @@
  * 8 test suites, 18 assertions — mirrors Python test class structure exactly.
  */
 
-import { describe, it, mock } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { fetchPage } from '../scripts/fetch-page.mjs';
 

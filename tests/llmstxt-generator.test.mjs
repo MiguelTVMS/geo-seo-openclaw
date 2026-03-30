@@ -67,7 +67,13 @@ const HOMEPAGE_HTML = `<!DOCTYPE html>
 // ---------------------------------------------------------------------------
 
 function makeNotFoundFetch() {
-  return async (url) => ({ status: 404, text: async () => '' });
+  return async (url) => {
+    if (url.includes('/llms.txt') || url.includes('/llms-full.txt')) {
+      return { status: 404, text: async () => '' };
+    }
+    // Homepage and other URLs return content so generate fallback works
+    return { status: 200, text: async () => HOMEPAGE_HTML };
+  };
 }
 
 function makeValidFetch() {
@@ -218,9 +224,11 @@ describe('runLlmstxt — combined', () => {
 
   it('generates file when not found in validate mode', async () => {
     const result = await runLlmstxt('https://example.com', 'validate', { fetchFn: makeNotFoundFetch() });
-    // Should include generated field from the generation fallback
-    // (not_found + generated combined)
     assert.ok(Object.hasOwn(result, 'issues'));
+    // validate mode falls back to generate when file not found
+    assert.strictEqual(result.status, 'not_found');
+    assert.ok(typeof result.generated === 'string');
+    assert.ok(result.generated.length > 0);
   });
 
   it('returns generated content in generate mode', async () => {

@@ -153,7 +153,7 @@ export async function generateLlmstxt(url, { fetchFn = fetch, maxPages = 30 } = 
 
   let homepageHtml = '';
   try {
-    const res = await fetchFn(url, { headers: DEFAULT_HEADERS });
+    const res = await fetchFn(`${base}/`, { headers: DEFAULT_HEADERS });
     homepageHtml = await res.text();
   } catch (err) {
     result.issues.push(`Failed to fetch homepage: ${err.message}`);
