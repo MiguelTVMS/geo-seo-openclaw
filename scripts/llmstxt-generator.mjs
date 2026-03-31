@@ -193,9 +193,9 @@ export async function generateLlmstxt(url, { fetchFn = fetch, maxPages = 30 } = 
     Support: [],
   };
 
-  // Initialize seen with just the base URL (not base+'/' duplicate)
-  // so pages_analyzed accurately reflects discovered URLs
-  const seen = new Set([base]);
+  // Seed seen with both normalized forms of the root URL to avoid
+  // counting base and base+'/' as separate discovered URLs
+  const seen = new Set([base, base + '/']);
   const SKIP_EXTS = /\.(pdf|jpg|jpeg|png|gif|svg|webp|css|js|ico|xml|json)$/i;
 
   $('a[href]').each((_, el) => {

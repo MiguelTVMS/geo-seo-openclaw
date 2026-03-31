@@ -91,9 +91,9 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch, includeHtm
         result.redirect_chain.push({ url: currentUrl, from: currentUrl, to: nextUrl, status });
         currentUrl = nextUrl;
         if (i === MAX_REDIRECTS - 1) {
-        redirectLimitExceeded = true;
-        break; // Don't process the redirect response as page content
-      }
+          redirectLimitExceeded = true;
+          break; // Stop here — do not fall through to parse a 3xx as page content
+        }
         continue;
       }
       break;
@@ -102,9 +102,9 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch, includeHtm
     if (!response) throw new Error('No response received');
     if (redirectLimitExceeded) {
       result.errors.push('Too many redirects');
-    }
-
-    result.status_code = response.status;
+      result.status_code = response.status;
+      // Skip HTML parsing — response is a redirect, not page content
+    } else {
 
     // Collect response headers
     const rawHeaders = {};
@@ -227,6 +227,7 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch, includeHtm
         );
       }
     }
+    } // end else (not redirectLimitExceeded)
   } catch (err) {
     if (err.name === 'AbortError') {
       result.errors.push(`Timeout after ${timeout} seconds`);
