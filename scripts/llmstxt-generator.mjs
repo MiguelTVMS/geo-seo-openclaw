@@ -303,7 +303,8 @@ export async function runLlmstxt(url, mode = 'validate', { fetchFn = fetch } = {
         ...(Array.isArray(validation.suggestions) ? validation.suggestions : []),
         ...(Array.isArray(generated.suggestions) ? generated.suggestions : []),
       ],
-      status: 'not_found',
+      // Preserve generation failure status; don't mask 'error' as 'not_found'
+      status: generated.status === 'error' ? 'error' : 'not_found',
     };
   }
   return generateLlmstxt(url, { fetchFn });

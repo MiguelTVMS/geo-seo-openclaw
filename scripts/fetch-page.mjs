@@ -186,15 +186,18 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch, includeHtm
     // Use the final URL after redirect chain for link resolution and classification
     const effectiveUrl = currentUrl;
     const parsedUrl = new URL(effectiveUrl);
-    const baseDomain = parsedUrl.hostname;
+    const baseDomain = parsedUrl.host;
     $('a[href]').each((_, el) => {
-      const href = $(el).attr('href');
+      const $el = $(el);
+      const href = $el.attr('href');
       if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+      // Skip links inside nav/header/footer to match Python decompose() parity
+      if ($el.closest('nav, header, footer').length) return;
       try {
         const abs = new URL(href, effectiveUrl).href;
         const parsed = new URL(abs);
-        const linkText = $(el).text().trim();
-        if (parsed.hostname === baseDomain) {
+        const linkText = $el.text().trim();
+        if (parsed.host === baseDomain) {
           result.internal_links.push({ url: abs, text: linkText });
         } else if (['http:', 'https:'].includes(parsed.protocol)) {
           result.external_links.push({ url: abs, text: linkText });
