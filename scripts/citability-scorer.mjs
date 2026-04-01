@@ -200,7 +200,8 @@ export async function analyzePageCitability(url, { fetchFn } = {}) {
 
   // Reuse HTML from fetchPage if available; refetch only as fallback
   // This avoids a second network request for the same URL
-  const html = pageData.html || await refetchHtml(url, fetchFn);
+  const effectiveUrl = pageData.url || url;
+  const html = pageData.html || await refetchHtml(effectiveUrl, fetchFn);
   const $ = cheerio.load(html || '');
 
   // Remove non-content elements

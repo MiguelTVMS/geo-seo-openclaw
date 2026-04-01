@@ -346,7 +346,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
 
   const url = args[urlIdx + 1];
-  const mode = modeIdx !== -1 ? args[modeIdx + 1] : 'validate';
+  let mode = 'validate';
+  if (modeIdx !== -1) {
+    const modeArg = args[modeIdx + 1];
+    if (!modeArg || modeArg.startsWith('--')) {
+      process.stderr.write('Error: --mode value is required\n');
+      process.stderr.write('Run with --help for usage.\n');
+      process.stdout.write(JSON.stringify({ error: '--mode value is required' }) + '\n');
+      process.exit(1);
+    }
+    mode = modeArg;
+  }
 
   runLlmstxt(url, mode)
     .then((result) => process.stdout.write(JSON.stringify(result, null, 2) + '\n'))
