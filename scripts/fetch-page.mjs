@@ -70,10 +70,12 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch, includeHtm
     // Manually follow redirects to populate redirect_chain
     const MAX_REDIRECTS = 10;
     let currentUrl = url;
+    let lastRequestedUrl = url; // tracks the URL we actually sent a request to
     let response;
     let redirectLimitExceeded = false;
 
     for (let i = 0; i < MAX_REDIRECTS; i++) {
+      lastRequestedUrl = currentUrl;
       response = await fetchFn(currentUrl, {
         headers: DEFAULT_HEADERS,
         redirect: 'manual',
@@ -103,7 +105,9 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch, includeHtm
     if (redirectLimitExceeded) {
       result.errors.push('Too many redirects');
       result.status_code = response.status;
-      result.url = currentUrl;
+      // Use lastRequestedUrl (the URL we actually fetched), not currentUrl
+      // which was already updated to the unfetched redirect target
+      result.url = lastRequestedUrl;
       // Skip HTML parsing — response is a redirect, not page content
     } else {
     // Record effective URL and status after following redirects
