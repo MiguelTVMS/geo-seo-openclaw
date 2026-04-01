@@ -103,8 +103,12 @@ export async function fetchPage(url, { timeout = 30, fetchFn = fetch, includeHtm
     if (redirectLimitExceeded) {
       result.errors.push('Too many redirects');
       result.status_code = response.status;
+      result.url = currentUrl;
       // Skip HTML parsing — response is a redirect, not page content
     } else {
+    // Record effective URL and status after following redirects
+    result.status_code = response.status;
+    result.url = currentUrl;
 
     // Collect response headers
     const rawHeaders = {};

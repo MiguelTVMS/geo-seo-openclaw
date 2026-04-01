@@ -331,6 +331,7 @@ describe('TestOutputContract', () => {
     for (const field of required) {
       assert.ok(Object.hasOwn(result, field), `Missing field: ${field}`);
     }
+    assert.strictEqual(result.status_code, 200);
   });
 
   it('extracts title correctly', async () => {

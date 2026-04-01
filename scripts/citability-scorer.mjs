@@ -188,8 +188,14 @@ export function scorePassage(text, heading = null) {
 export async function analyzePageCitability(url, { fetchFn } = {}) {
   const pageData = await fetchPage(url, fetchFn ? { fetchFn, includeHtml: true } : { includeHtml: true });
 
-  if (pageData.errors.length > 0 && !pageData.status_code) {
-    return { url, error: pageData.errors.join('; ') };
+  // Gate on real network failure (status_code null = never got a response)
+  // not on errors[] which can contain non-fatal warnings (e.g. invalid JSON-LD)
+  if (pageData.status_code == null) {
+    const message =
+      Array.isArray(pageData.errors) && pageData.errors.length > 0
+        ? pageData.errors.join('; ')
+        : 'Failed to fetch page content';
+    return { url, error: message };
   }
 
   // Reuse HTML from fetchPage if available; refetch only as fallback
