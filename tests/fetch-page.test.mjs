@@ -359,3 +359,78 @@ describe('TestOutputContract', () => {
     assert.strictEqual(result.structured_data[0]['@type'], 'Organization');
   });
 });
+
+describe('TestRedirectHandling', () => {
+  it('single 301 redirect populates redirect_chain and resolves final page', async () => {
+    const finalHtml = `<html><head><title>Final Page</title></head><body><p>Content here after redirect</p></body></html>`;
+    let callCount = 0;
+    const fetchFn = async (url) => {
+      callCount++;
+      if (callCount === 1) {
+        return {
+          status: 301,
+          headers: {
+            get: (h) => h === 'location' ? 'http://example.com/final' : null,
+            forEach: () => {},
+          },
+          text: async () => '',
+        };
+      }
+      return {
+        status: 200,
+        headers: { get: () => null, forEach: () => {} },
+        text: async () => finalHtml,
+      };
+    };
+    const result = await fetchPage('http://example.com/', { fetchFn });
+    assert.strictEqual(result.status_code, 200);
+    assert.strictEqual(result.redirect_chain.length, 1);
+    assert.strictEqual(result.redirect_chain[0].status, 301);
+    assert.strictEqual(result.redirect_chain[0].from, 'http://example.com/');
+    assert.strictEqual(result.redirect_chain[0].to, 'http://example.com/final');
+    assert.strictEqual(result.title, 'Final Page');
+  });
+
+  it('relative Location header is resolved to absolute URL', async () => {
+    let callCount = 0;
+    const fetchFn = async (url) => {
+      callCount++;
+      if (callCount === 1) {
+        return {
+          status: 302,
+          headers: {
+            get: (h) => h === 'location' ? '/new-path' : null,
+            forEach: () => {},
+          },
+          text: async () => '',
+        };
+      }
+      return {
+        status: 200,
+        headers: { get: () => null, forEach: () => {} },
+        text: async () => '<html><head><title>New Path</title></head><body><p>content</p></body></html>',
+      };
+    };
+    const result = await fetchPage('http://example.com/', { fetchFn });
+    assert.strictEqual(result.redirect_chain[0].to, 'http://example.com/new-path');
+    assert.strictEqual(result.status_code, 200);
+  });
+
+  it('MAX_REDIRECTS exceeded sets error and skips HTML parsing', async () => {
+    let n = 0;
+    const fetchFn = async (url) => ({
+      status: 301,
+      headers: {
+        get: (h) => h === 'location' ? `http://example.com/loop${++n}` : null,
+        forEach: () => {},
+      },
+      text: async () => '',
+    });
+    const result = await fetchPage('http://example.com/', { fetchFn });
+    assert.ok(result.errors.some((e) => /too many redirects/i.test(e)));
+    assert.ok(result.redirect_chain.length > 0);
+    // HTML parsing skipped — title should remain null
+    assert.strictEqual(result.title, null);
+    assert.strictEqual(result.word_count, 0);
+  });
+});

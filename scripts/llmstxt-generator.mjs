@@ -314,7 +314,8 @@ export async function runLlmstxt(url, mode = 'validate', { fetchFn = fetch } = {
 // ---------------------------------------------------------------------------
 
 function getBase(url) {
-  const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
+  const normalized = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+  const parsed = new URL(normalized);
   // Use host (hostname + port) to preserve explicit ports (e.g., localhost:3000)
   return `${parsed.protocol}//${parsed.host}`;
 }
